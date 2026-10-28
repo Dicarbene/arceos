@@ -24,4 +24,4 @@ objcopy --localize-hidden "$build_dir/fopen_test.o"
 "${CC:-cc}" -fsanitize=address,undefined -Wl,--gc-sections \
     "$build_dir/fopen_test.o" -o "$build_dir/fopen_test"
 "$build_dir/fopen_test"
-echo "PASS: fopen allocation failure preserves ENOMEM without opening a file"
+echo "PASS: fopen allocation/open failures preserve errno and release FILE allocations"

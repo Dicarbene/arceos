@@ -28,6 +28,8 @@ and freeing. AddressSanitizer and UndefinedBehaviorSanitizer check memory use.
 The C fixture requires a 64-bit host, matching the existing 8-byte header ABI.
 A separate fixture compiles the real stdio implementation with axlibc's headers
 and checks that fopen preserves ENOMEM without opening a file when allocation fails.
+It also repeats a failed open after successful allocation, checking that every
+FILE is freed and that the open error is preserved.
 
 For an actual C application on a 128 MiB x86_64 guest:
 

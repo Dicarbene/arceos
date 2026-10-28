@@ -213,8 +213,10 @@ FILE *fopen(const char *filename, const char *mode)
     flags = __fmodeflags(mode);
     // TODO: currently mode is unused in ax_open
     int fd = open(filename, flags, 0666);
-    if (fd < 0)
+    if (fd < 0) {
+        free(f);
         return NULL;
+    }
     f->fd = fd;
 
     return f;
