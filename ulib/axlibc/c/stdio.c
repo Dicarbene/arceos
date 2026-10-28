@@ -30,44 +30,44 @@ FILE *const stdin = &__stdin_FILE;
 FILE *const stdout = &__stdout_FILE;
 FILE *const stderr = &__stderr_FILE;
 
-// Returns: number of chars written, negative for failure
-// Warn: buffer_len[f] will not be changed
-static int __write_buffer(FILE *f)
-{
-    int r = 0;
-    if (f->buffer_len == 0)
-        return 0;
-    r = write(f->fd, f->buf, f->buffer_len);
-    return r;
-}
-
-// Clear buffer_len[f]
-static void __clear_buffer(FILE *f)
-{
-    f->buffer_len = 0;
-}
-
 static int __fflush(FILE *f)
 {
-    int r = __write_buffer(f);
-    __clear_buffer(f);
-    return r >= 0 ? 0 : r;
+    size_t written = 0;
+    while (written < f->buffer_len) {
+        ssize_t r = write(f->fd, f->buf + written, f->buffer_len - written);
+        if (r < 0 && errno == EINTR)
+            continue;
+        if (r <= 0) {
+            if (r == 0)
+                errno = EIO;
+            /* A later fflush can retry the bytes that were not written. */
+            f->buffer_len -= written;
+            memmove(f->buf, f->buf + written, f->buffer_len);
+            return EOF;
+        }
+        written += r;
+    }
+    f->buffer_len = 0;
+    return 0;
 }
 
 static int out(FILE *f, const char *s, size_t l)
 {
     int ret = 0;
     for (size_t i = 0; i < l; i++) {
+        /* A failed flush can leave a full buffer for the caller to retry. */
+        if (f->buffer_len == FILE_BUF_SIZE) {
+            if (__fflush(f) < 0)
+                return EOF;
+            ret += FILE_BUF_SIZE;
+        }
         char c = s[i];
         f->buf[f->buffer_len++] = c;
         if (f->buffer_len == FILE_BUF_SIZE || c == '\n') {
-            int r = __write_buffer(f);
-            __clear_buffer(f);
-            if (r < 0)
-                return r;
-            if (r < f->buffer_len)
-                return ret + r;
-            ret += r;
+            int buffered = f->buffer_len;
+            if (__fflush(f) < 0)
+                return EOF;
+            ret += buffered;
         }
     }
     return ret;
@@ -201,7 +201,7 @@ FILE *fopen(const char *filename, const char *mode)
     FILE *f;
     int flags;
 
-    if (!strchr("rwa", *mode)) {
+    if (!*mode || !strchr("rwa", *mode)) {
         errno = EINVAL;
         return 0;
     }
@@ -214,10 +214,13 @@ FILE *fopen(const char *filename, const char *mode)
     // TODO: currently mode is unused in ax_open
     int fd = open(filename, flags, 0666);
     if (fd < 0) {
+        int saved_errno = errno;
         free(f);
+        errno = saved_errno;
         return NULL;
     }
     f->fd = fd;
+    f->buffer_len = 0;
 
     return f;
 }
@@ -282,7 +285,21 @@ int fputs(const char *restrict s, FILE *restrict f)
 
 int fclose(FILE *f)
 {
-    return close(f->fd);
+    int ret = 0;
+    int saved_errno = 0;
+    if (__fflush(f) < 0) {
+        ret = EOF;
+        saved_errno = errno;
+    }
+    if (close(f->fd) < 0 && ret == 0) {
+        ret = EOF;
+        saved_errno = errno;
+    }
+    if (f != stdin && f != stdout && f != stderr)
+        free(f);
+    if (ret == EOF)
+        errno = saved_errno;
+    return ret;
 }
 
 int fileno(FILE *f)

@@ -15,16 +15,19 @@ MODES = ["fallible", "small", "trait-oom", "malloc-oom", "size-max",
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--release", action="store_true")
+    parser.add_argument("--allocator", choices=["tlsf", "buddy", "slab"], default="tlsf")
     args = parser.parse_args()
     resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
     profile = "release" if args.release else "debug"
-    command = ["cargo", "build", "--locked", "--target-dir", str(ROOT / "target")]
+    target_dir = ROOT / "target" / args.allocator
+    command = ["cargo", "build", "--locked", "--no-default-features",
+               "--features", args.allocator, "--target-dir", str(target_dir)]
     if args.release:
         command.append("--release")
     subprocess.run(command, cwd=ROOT, check=True)
     rows = []
     for mode in MODES:
-        proc = subprocess.run([str(ROOT / "target" / profile / "arceos-oom-probe"), mode],
+        proc = subprocess.run([str(target_dir / profile / "arceos-oom-probe"), mode],
                               capture_output=True, text=True, timeout=15)
         if mode == "rust-vec-oom":
             matched = (proc.returncode == -signal.SIGABRT and
@@ -37,8 +40,8 @@ def main():
         if not matched:
             print(proc.stdout + proc.stderr)
     result = {"rustc": subprocess.check_output(["rustc", "--version"], text=True).strip(),
-              "profile": profile, "results": rows}
-    (ROOT / "target" / f"oom-{profile}.json").write_text(json.dumps(result, indent=2) + "\n")
+              "allocator": args.allocator, "profile": profile, "results": rows}
+    (target_dir / f"oom-{profile}.json").write_text(json.dumps(result, indent=2) + "\n")
     if not all(row["passed"] for row in rows):
         raise SystemExit(1)
 

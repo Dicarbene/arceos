@@ -18,10 +18,24 @@ jobs:
     - name: Run unit tests
       run: make unittest_no_fail_fast
     - name: Check C allocation failure paths
+      run: sh ulib/axlibc/tests/alloc_oom/run_c_stdlib_tests.sh
+
+  allocation-test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        allocator: [tlsf, buddy, slab]
+    steps:
+    - uses: actions/checkout@v4
+    - uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ env.rust-toolchain }}
+    - name: Check allocation failure and recovery
       run: |
-        python3 ulib/axlibc/tests/alloc_oom/run.py
-        python3 ulib/axlibc/tests/alloc_oom/run.py --release
-        sh ulib/axlibc/tests/alloc_oom/run_c_stdlib_tests.sh
+        cargo test -p axalloc --no-default-features --features ${{ matrix.allocator }},axallocator/page-alloc-256m
+        python3 ulib/axlibc/tests/alloc_oom/run.py --allocator ${{ matrix.allocator }}
+        python3 ulib/axlibc/tests/alloc_oom/run.py --allocator ${{ matrix.allocator }} --release
 
   app-test:
     runs-on: ${{ matrix.os }}
@@ -50,6 +64,19 @@ jobs:
     - uses: arceos-org/setup-musl@v1.0.3
       with:
         arch: ${{ matrix.arch }}
+    - name: Check C allocation failure on QEMU
+      timeout-minutes: 15
+      if: matrix.arch == 'x86_64'
+      shell: bash
+      run: |
+        cases=(valid-layout-1GiB SIZE_MAX PTRDIFF_MAX)
+        for case in 0 1 2; do
+          make_args=(A=examples/malloc-oom-c ARCH=x86_64 MEM=128M ACCEL=n
+                     APP_CFLAGS=-DMALLOC_OOM_CASE=$case)
+          make "${make_args[@]}" -W examples/malloc-oom-c/main.c
+          timeout 120s make "${make_args[@]}" run | tee "malloc-oom-$case.log"
+          grep -Fq "malloc-oom: PASS ${cases[$case]}" "malloc-oom-$case.log"
+        done
     - name: Run app tests
       run: |
         make disk_img

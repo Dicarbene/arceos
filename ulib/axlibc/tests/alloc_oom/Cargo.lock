@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "ax_slab_allocator"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a04dda49054845b496a16f62a58614b1935ed2b4df0b91f9eea4179a5820f08"
+dependencies = [
+ "buddy_system_allocator 0.12.0",
+]
+
+[[package]]
 name = "axalloc"
 version = "0.2.0"
 dependencies = [
@@ -29,7 +38,9 @@ version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3894f6027940d4b013f1d1f9e2e61b47a9e4a7dbf1a0ba10dd33e7bb265ea733"
 dependencies = [
+ "ax_slab_allocator",
  "bitmap-allocator",
+ "buddy_system_allocator 0.10.0",
  "cfg-if",
  "rlsf",
 ]
@@ -74,6 +85,18 @@ checksum = "e11e01b72b2a40aab84454fb6b71090c2a6873e1b5ba22a8e3d74e83086a2304"
 dependencies = [
  "bit_field",
 ]
+
+[[package]]
+name = "buddy_system_allocator"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7913f22349ffcfc6ca0ca9a656ec26cfbba538ed49c31a273dff2c5d1ea83d9"
+
+[[package]]
+name = "buddy_system_allocator"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b672b945a3e4f4f40bfd4cd5ee07df9e796a42254ce7cd6d2599ad969244c44a"
 
 [[package]]
 name = "cfg-if"

@@ -8,6 +8,9 @@ python3 ulib/axlibc/tests/alloc_oom/run.py --release
 sh ulib/axlibc/tests/alloc_oom/run_c_stdlib_tests.sh
 ```
 
+The Rust probe defaults to TLSF. Use `--allocator buddy` or `--allocator slab`
+to check the other allocators. CI runs all three in debug and release builds.
+
 The Rust probe compiles the actual axlibc `malloc.rs`, renaming its exported
 symbols to avoid replacing the host C runtime's allocator. Oversized requests
 are forwarded to the real axalloc allocator with a private 256 KiB heap.
@@ -30,6 +33,9 @@ A separate fixture compiles the real stdio implementation with axlibc's headers
 and checks that fopen preserves ENOMEM without opening a file when allocation fails.
 It also repeats a failed open after successful allocation, checking that every
 FILE is freed and that the open error is preserved.
+The stdio fixture also checks buffer initialization, partial writes, interrupted
+writes, retry after a failed flush, and fclose cleanup after write or close errors.
+An intentional overflow verifies that UBSan failures stop the test script.
 
 For an actual C application on a 128 MiB x86_64 guest:
 

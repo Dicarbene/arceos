@@ -13,6 +13,9 @@ extern crate alloc;
 
 mod page;
 
+#[cfg(feature = "slab")]
+mod slab;
+
 #[cfg(test)]
 mod tests;
 
@@ -29,7 +32,7 @@ pub use page::GlobalPage;
 cfg_if::cfg_if! {
     if #[cfg(feature = "slab")] {
         /// The default byte allocator.
-        pub type DefaultByteAllocator = axallocator::SlabByteAllocator;
+        pub type DefaultByteAllocator = slab::SlabByteAllocator;
     } else if #[cfg(feature = "buddy")] {
         /// The default byte allocator.
         pub type DefaultByteAllocator = axallocator::BuddyByteAllocator;
